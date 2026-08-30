@@ -1,0 +1,52 @@
+.global-notice {
+  margin: -8px 0 18px;
+  padding: 10px 13px;
+  border-left: 3px solid var(--verm);
+  background: #f7eee9;
+  color: #6e4038;
+  font-size: 13px;
+}
+
+.master-panel { min-width: 0; }
+.master-section {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #e7e2da;
+}
+.master-register {
+  max-height: 270px;
+  margin: 13px 20px 0;
+  overflow: auto;
+  border: 1px solid #ebe6de;
+  background: #fbfaf7;
+}
+.activity-register { max-height: 220px; }
+.master-row {
+  display: flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 4px 6px 4px 10px;
+  border-bottom: 1px solid #eeeae3;
+  color: #344657;
+  font-size: 12px;
+}
+.master-row:last-child { border-bottom: 0; }
+.master-row > span { flex: 1; min-width: 0; }
+.master-actions { display: flex; align-items: center; gap: 2px; }
+.icon-button.destructive:hover { color: var(--verm); background: #fae6e3; }
+.icon-button:disabled { opacity: .3; cursor: not-allowed; }
+.square-action { width: 38px; padding: 0; }
+.confirm-delete { background: var(--verm) !important; color: #fff !important; }
+.budget-row { align-items: center; }
+.budget-row > span { flex: 1; min-width: 0; }
+.budget-row > b { min-width: 80px; text-align: right; }
+.budget-cancel { min-height: 38px; }
+
+@media (max-width: 760px) {
+  .master-register { max-height: 240px; }
+  .admin-form-row .square-action { width: 38px; }
+  .budget-form { grid-template-columns: 1fr; }
+  .budget-form .primary-button, .budget-form .budget-cancel { grid-column: auto; }
+  .budget-row { flex-wrap: wrap; }
+  .budget-row > span { min-width: calc(100% - 95px); }
+}

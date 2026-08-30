@@ -2,7 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { FirebaseError } from "firebase/app";
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut, type User } from "firebase/auth";
-import { collection, deleteDoc, doc, onSnapshot, runTransaction, setDoc } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDoc, onSnapshot, runTransaction, setDoc, writeBatch } from "firebase/firestore";
 import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
 import type { ActivityRecord, ActivityType, Brand, Budget, Country, Member, UserRole, WorkspaceData } from "@/lib/models";
 import { initialActivityTypes, initialBrands, now } from "@/lib/templateData";
@@ -26,6 +26,9 @@ type WorkspaceContextValue = WorkspaceData & {
   saveBudget: (item: Budget) => Promise<void>;
   saveActivity: (item: ActivityRecord) => Promise<void>;
   saveMember: (item: Member) => Promise<void>;
+  removeBrand: (id: string) => Promise<void>;
+  removeActivityType: (id: string) => Promise<void>;
+  removeBudget: (id: string) => Promise<void>;
   removeActivity: (id: string) => Promise<void>;
 };
 
@@ -99,22 +102,38 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const syncBrandCatalogue = useCallback(async () => {
+    const database = db;
+    if (!database) return;
+    const markerRef = doc(database, "workspaces", "default", "brands", "__catalogue-v1");
+    if ((await getDoc(markerRef)).exists()) return;
+    const batch = writeBatch(database);
+    initialBrands.forEach((brand) => batch.set(doc(database, "workspaces", "default", "brands", brand.id), brand, { merge: true }));
+    batch.set(markerRef, { system: true, version: 1, appliedAt: now() });
+    await batch.commit();
+  }, []);
+
   useEffect(() => {
     if (!isFirebaseConfigured || !auth) return;
     return onAuthStateChanged(auth, async (current) => {
       setAuthLoading(false);
       setUser(current);
       if (!current) { setRole("viewer"); return; }
-      try { setRole(await provisionMember(current)); }
+      try {
+        const nextRole = await provisionMember(current);
+        setRole(nextRole);
+        if (nextRole === "owner" || nextRole === "admin") await syncBrandCatalogue();
+      }
       catch (error) { setFirebaseError(error instanceof Error ? error.message : "Could not initialize your shared workspace."); }
     });
-  }, [provisionMember]);
+  }, [provisionMember, syncBrandCatalogue]);
 
   useEffect(() => {
     if (!isFirebaseConfigured || !db || !user || user.uid === "local") return;
     const buckets: Bucket[] = ["brands", "activityTypes", "countries", "budgets", "activities", "members"];
     const unsubscribers = buckets.map((bucket) => onSnapshot(collectionRef(bucket), (snapshot) => {
-      const values = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+      const values = snapshot.docs.filter((item) => item.id !== "__catalogue-v1").map((item) => ({ id: item.id, ...item.data() })) as Array<{ id: string; name?: string }>;
+      if (bucket === "brands" || bucket === "activityTypes") values.sort((left, right) => String(left.name ?? "").localeCompare(String(right.name ?? "")));
       setData((previous) => ({ ...previous, [bucket]: values } as WorkspaceData));
     }, (error) => setFirebaseError(error.message)));
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
@@ -133,6 +152,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const removeActivity = useCallback(async (id: string) => {
     setData((previous) => ({ ...previous, activities: previous.activities.filter((activity) => activity.id !== id) }));
     if (isFirebaseConfigured && db) await deleteDoc(doc(collectionRef("activities"), id));
+  }, [collectionRef]);
+
+  const remove = useCallback(async (bucket: Bucket, id: string) => {
+    setData((previous) => ({ ...previous, [bucket]: (previous[bucket] as { id: string }[]).filter((item) => item.id !== id) } as WorkspaceData));
+    if (isFirebaseConfigured && db) await deleteDoc(doc(collectionRef(bucket), id));
   }, [collectionRef]);
 
   const signIn = useCallback(async () => {
@@ -155,7 +179,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     signIn, signOutUser,
     saveBrand: (item) => save("brands", item), saveActivityType: (item) => save("activityTypes", item), saveCountry: (item) => save("countries", item),
     saveBudget: (item) => save("budgets", item), saveActivity: (item) => save("activities", item), saveMember: (item) => save("members", item), removeActivity,
-  }), [activeCountryId, authLoading, data, firebaseError, removeActivity, role, save, signIn, signOutUser, user]);
+    removeBrand: (id) => remove("brands", id), removeActivityType: (id) => remove("activityTypes", id), removeBudget: (id) => remove("budgets", id),
+  }), [activeCountryId, authLoading, data, firebaseError, remove, removeActivity, role, save, signIn, signOutUser, user]);
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
 }
