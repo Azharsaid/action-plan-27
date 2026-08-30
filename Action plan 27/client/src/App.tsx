@@ -1,7 +1,7 @@
 /** Operational Ledger design reminder: the shell is a Swiss-editorial budget workspace with a dark rail, country ribbon, and ledger-first content. */
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Route, Switch } from "wouter";
+import { Route, Router, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { AppShell } from "./components/AppShell";
 import { WorkspaceProvider, useWorkspace } from "./contexts/WorkspaceContext";
@@ -19,5 +19,9 @@ function AuthenticatedRoutes() {
   return <AppShell><Switch><Route path="/" component={Dashboard} /><Route path="/plan" component={PlanPage} /><Route path="/shared" component={SharedActivitiesPage} /><Route path="/admin" component={AdminPage} /><Route path="/404" component={NotFound} /><Route component={NotFound} /></Switch></AppShell>;
 }
 
-function App() { return <ErrorBoundary><TooltipProvider><WorkspaceProvider><AuthenticatedRoutes /><Toaster /></WorkspaceProvider></TooltipProvider></ErrorBoundary>; }
+const routerBase = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+function App() {
+  return <Router base={routerBase}><ErrorBoundary><TooltipProvider><WorkspaceProvider><AuthenticatedRoutes /><Toaster /></WorkspaceProvider></TooltipProvider></ErrorBoundary></Router>;
+}
 export default App;
