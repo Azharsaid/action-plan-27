@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Action Plan mark">
+  <rect width="64" height="64" rx="12" fill="#f6f3ed"/>
+  <path d="M16 16h32v8H16zm0 12h21v8H16zm0 12h14v8H16z" fill="#0f2a43"/>
+  <path d="M35 44 48 31v17H35z" fill="#ff4a3d"/>
+</svg>
