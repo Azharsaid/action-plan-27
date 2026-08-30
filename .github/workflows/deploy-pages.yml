@@ -6,16 +6,17 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -47,6 +48,21 @@ jobs:
         run: |
           cp "Action plan 27/dist/public/index.html" "Action plan 27/dist/public/404.html"
           touch "Action plan 27/dist/public/.nojekyll"
+
+      - name: Sync branch-based Pages files
+        run: |
+          mkdir -p assets
+          rsync -a --delete "Action plan 27/dist/public/assets/" assets/
+          cp "Action plan 27/dist/public/index.html" index.html
+          cp "Action plan 27/dist/public/404.html" 404.html
+          cp "Action plan 27/dist/public/.nojekyll" .nojekyll
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html 404.html .nojekyll assets
+          if ! git diff --cached --quiet; then
+            git commit -m "Sync GitHub Pages files"
+            git push
+          fi
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
