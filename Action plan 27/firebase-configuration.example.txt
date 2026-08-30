@@ -1,0 +1,17 @@
+# Copy these keys to GitHub Actions repository secrets or to a local .env.local file.
+# Obtain the six Firebase values from Firebase Console > Project settings > Your apps > Web app.
+
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_MESSAGING_SENDER_ID=
+VITE_FIREBASE_APP_ID=
+
+# For a project GitHub Pages site, use /repository-name/.
+# For a custom-domain or account root site, use /.
+VITE_BASE_PATH=/action-plan-planner/
+
+# Use a browser-readable CORS-accessible download URL of the original, untouched AP27.xlsx.
+# The workbook should remain outside the source repository if it contains confidential planning information.
+VITE_AP27_TEMPLATE_URL=

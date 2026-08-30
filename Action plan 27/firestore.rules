@@ -1,0 +1,42 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function workspace() { return get(/databases/$(database)/documents/workspaces/default); }
+    function isOwner() { return signedIn() && workspace().data.ownerId == request.auth.uid; }
+    function isAdmin() {
+      return signedIn() && (isOwner() || get(/databases/$(database)/documents/workspaces/default/members/$(request.auth.uid)).data.role == 'admin');
+    }
+    function canEdit() {
+      return signedIn() && (isAdmin() || get(/databases/$(database)/documents/workspaces/default/members/$(request.auth.uid)).data.role == 'editor');
+    }
+    function initializingOwner() {
+      return signedIn() && getAfter(/databases/$(database)/documents/workspaces/default).data.ownerId == request.auth.uid;
+    }
+
+    match /workspaces/default {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if isOwner();
+    }
+
+    match /workspaces/default/members/{userId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.auth.uid == userId && (
+        (request.resource.data.role == 'owner' && initializingOwner()) ||
+        (request.resource.data.role == 'editor' && exists(/databases/$(database)/documents/workspaces/default))
+      );
+      allow update, delete: if isOwner();
+    }
+
+    match /workspaces/default/activities/{activityId} {
+      allow read: if signedIn();
+      allow create, update, delete: if canEdit();
+    }
+
+    match /workspaces/default/{masterCollection}/{recordId} {
+      allow read: if signedIn();
+      allow create, update, delete: if masterCollection in ['brands', 'activityTypes', 'countries', 'budgets'] && (isAdmin() || initializingOwner());
+    }
+  }
+}
