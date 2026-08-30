@@ -1,5 +1,6 @@
 /** Operational Ledger design reminder: this shared data layer treats every budget and allocation as a traceable ledger record. */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { FirebaseError } from "firebase/app";
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut, type User } from "firebase/auth";
 import { collection, deleteDoc, doc, onSnapshot, runTransaction, setDoc } from "firebase/firestore";
 import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
@@ -31,6 +32,25 @@ type WorkspaceContextValue = WorkspaceData & {
 const LOCAL_KEY = "action-plan-planner-local-v1";
 const defaultData: WorkspaceData = { brands: initialBrands, activityTypes: initialActivityTypes, countries: [], budgets: [], activities: [], members: [] };
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
+
+function getSignInErrorMessage(error: unknown) {
+  if (error instanceof FirebaseError) {
+    switch (error.code) {
+      case "auth/unauthorized-domain":
+        return "Google sign-in is not yet authorized for azharsaid.github.io. Add this domain in Firebase Authentication settings, then try again.";
+      case "auth/popup-blocked":
+        return "Your browser blocked the Google sign-in window. Allow pop-ups for this website, then try again.";
+      case "auth/popup-closed-by-user":
+      case "auth/cancelled-popup-request":
+        return "Google sign-in was cancelled before it finished. Please try again.";
+      case "auth/operation-not-allowed":
+        return "Google sign-in is not enabled for this Firebase project.";
+      case "auth/network-request-failed":
+        return "The sign-in request could not reach Google. Check your connection and try again.";
+    }
+  }
+  return error instanceof Error ? error.message : "Google sign-in could not be completed. Please try again.";
+}
 
 function readLocal(): WorkspaceData {
   try {
@@ -116,9 +136,16 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [collectionRef]);
 
   const signIn = useCallback(async () => {
-    if (!auth) return;
+    if (!auth) {
+      setFirebaseError("Firebase Authentication is not configured for this website.");
+      return;
+    }
     setFirebaseError(null);
-    await signInWithPopup(auth, new GoogleAuthProvider());
+    try {
+      await signInWithPopup(auth, new GoogleAuthProvider());
+    } catch (error) {
+      setFirebaseError(getSignInErrorMessage(error));
+    }
   }, []);
   const signOutUser = useCallback(async () => { if (auth) await signOut(auth); }, []);
 
