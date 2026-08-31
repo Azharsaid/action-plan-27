@@ -7,7 +7,7 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import type { Budget, UserRole } from "@/lib/models";
+import type { Budget, Country, UserRole } from "@/lib/models";
 import { makeId, now } from "@/lib/templateData";
 
 const clean = (value: unknown) => String(value ?? "").trim();
@@ -18,10 +18,11 @@ export default function AdminPage() {
   const {
     isAdmin, role, brands, countries, budgets, activityTypes, activities, members,
     saveBrand, saveCountry, saveBudget, saveActivityType, saveMember,
-    removeBrand, removeActivityType, removeBudget, firebaseReady,
+    removeCountry, removeBrand, removeActivityType, removeBudget, firebaseReady,
   } = useWorkspace();
   const [countryName, setCountryName] = useState("");
   const [currency, setCurrency] = useState("");
+  const [editingCountryId, setEditingCountryId] = useState<string | null>(null);
   const [brandName, setBrandName] = useState("");
   const [activityName, setActivityName] = useState("");
   const [editingBrandId, setEditingBrandId] = useState<string | null>(null);
@@ -33,6 +34,7 @@ export default function AdminPage() {
   const [notice, setNotice] = useState("");
 
   const sortedBrands = useMemo(() => byName(brands), [brands]);
+  const sortedCountries = useMemo(() => byName(countries), [countries]);
   const sortedActivityTypes = useMemo(() => byName(activityTypes), [activityTypes]);
   const sortedBudgets = useMemo(() => [...budgets].sort((left, right) => {
     const leftLabel = `${countries.find((item) => item.id === left.countryId)?.name ?? ""} ${brands.find((item) => item.id === left.brandId)?.name ?? ""}`;
@@ -42,12 +44,19 @@ export default function AdminPage() {
 
   if (!isAdmin) return <div className="page admin-page"><section className="access-denied"><ShieldCheck size={30} /><p className="eyebrow">Administrator access</p><h1>This page is reserved for workspace administrators.</h1><p>Ask the workspace owner to assign you an administrator role if you need to maintain countries, brands, budgets, or users.</p></section></div>;
 
-  const addCountry = async () => {
+  const submitCountry = async () => {
     const name = countryName.trim();
     if (!name) return;
-    await saveCountry({ id: makeId("country"), name, currency: currency.trim().toUpperCase() || "USD", createdAt: now() });
-    setCountryName(""); setCurrency("");
+    if (countries.some((country) => country.id !== editingCountryId && country.name.toLowerCase() === name.toLowerCase())) {
+      setNotice("This country already exists."); return;
+    }
+    const existing = countries.find((country) => country.id === editingCountryId);
+    await saveCountry({ id: existing?.id ?? makeId("country"), name, currency: currency.trim().toUpperCase() || "USD", createdAt: existing?.createdAt ?? now() });
+    setCountryName(""); setCurrency(""); setEditingCountryId(null);
+    setNotice(existing ? "Country updated." : "Country added.");
   };
+  const editCountry = (country: Country) => { setEditingCountryId(country.id); setCountryName(country.name); setCurrency(country.currency); setNotice("Editing selected country."); };
+  const cancelCountryEdit = () => { setEditingCountryId(null); setCountryName(""); setCurrency(""); };
 
   const submitBrand = async () => {
     const name = brandName.trim();
@@ -118,8 +127,8 @@ export default function AdminPage() {
     <div className="admin-grid">
       <section className="panel admin-panel master-panel">
         <div className="panel-heading"><div><p className="eyebrow">Master data</p><h2>Countries, brands & activities</h2></div></div>
-        <div className="admin-form-row"><label className="form-field"><span>New country</span><input value={countryName} onChange={(event) => setCountryName(event.target.value)} placeholder="e.g. Jordan" /></label><label className="form-field"><span>Currency</span><input value={currency} onChange={(event) => setCurrency(event.target.value)} placeholder="e.g. JOD" maxLength={3} /></label><button className="primary-button compact" onClick={addCountry}><Plus size={16} />Add</button></div>
-        <div className="tag-register">{countries.length ? countries.map((country) => <span key={country.id}>{country.name}<b>{country.currency}</b></span>) : <small>No countries yet.</small>}</div>
+        <div className="admin-form-row"><label className="form-field"><span>{editingCountryId ? "Edit country" : "New country"}</span><input value={countryName} onChange={(event) => setCountryName(event.target.value)} placeholder="e.g. Jordan" /></label><label className="form-field"><span>Currency</span><input value={currency} onChange={(event) => setCurrency(event.target.value)} placeholder="e.g. JOD" maxLength={3} /></label><button className="primary-button compact" onClick={submitCountry}>{editingCountryId ? <Check size={16} /> : <Plus size={16} />}{editingCountryId ? "Update" : "Add"}</button>{editingCountryId && <button className="quiet-button compact square-action" onClick={cancelCountryEdit} aria-label="Cancel country editing"><X size={16} /></button>}</div>
+        {sortedCountries.length ? <div className="master-register country-register">{sortedCountries.map((country) => { const inUse = budgets.some((item) => item.countryId === country.id) || activities.some((item) => item.countryId === country.id); return <div className="master-row" key={country.id}><span>{country.name}<b className="country-currency">{country.currency}</b></span><div className="master-actions"><button className="icon-button" onClick={() => editCountry(country)} aria-label={`Edit ${country.name}`}><Pencil size={14} /></button><DeleteControl label={country.name} type="country" disabled={inUse} disabledReason="This country is used by a budget or action-plan row." onDelete={async () => { await removeCountry(country.id); if (editingCountryId === country.id) cancelCountryEdit(); setNotice("Country deleted."); }} /></div></div>; })}</div> : <div className="tag-register"><small>No countries yet.</small></div>}
 
         <div className="master-section"><div className="admin-form-row"><label className="form-field grow"><span>{editingBrandId ? "Edit brand" : "New brand"}</span><input value={brandName} onChange={(event) => setBrandName(event.target.value)} placeholder="Brand name" /></label><button className="primary-button compact" onClick={submitBrand}>{editingBrandId ? <Check size={16} /> : <Plus size={16} />}{editingBrandId ? "Update" : "Add brand"}</button>{editingBrandId && <button className="quiet-button compact square-action" onClick={() => { setEditingBrandId(null); setBrandName(""); }} aria-label="Cancel brand editing"><X size={16} /></button>}</div>
           <div className="master-register">{sortedBrands.map((brand) => { const inUse = budgets.some((item) => item.brandId === brand.id) || activities.some((item) => item.brandId === brand.id); return <div className="master-row" key={brand.id}><span>{brand.name}</span><div className="master-actions"><button className="icon-button" onClick={() => { setEditingBrandId(brand.id); setBrandName(brand.name); }} aria-label={`Edit ${brand.name}`}><Pencil size={14} /></button><DeleteControl label={brand.name} type="brand" disabled={inUse} disabledReason="This brand is used by a budget or action-plan row." onDelete={async () => { await removeBrand(brand.id); setNotice("Brand deleted."); }} /></div></div>; })}</div>
@@ -131,7 +140,7 @@ export default function AdminPage() {
       </section>
 
       <section className="panel admin-panel budget-panel"><div className="panel-heading"><div><p className="eyebrow">Budget ledger</p><h2>{editingBudgetId ? "Edit budget" : "Upload or set budget"}</h2></div><label className="file-button"><Upload size={16} />Import CSV / Excel<input type="file" accept=".csv,.xlsx,.xls" onChange={importBudgetFile} /></label></div><p className="panel-copy">For imports, use three columns named <b>Country</b>, <b>Brand</b>, and <b>Budget</b>. Existing country/brand budgets are updated rather than duplicated.</p>
-        <div className="budget-form"><Select label="Country" value={budgetCountry} onChange={setBudgetCountry}><option value="">Select country</option>{countries.map((country) => <option value={country.id} key={country.id}>{country.name}</option>)}</Select><Select label="Brand" value={budgetBrand} onChange={setBudgetBrand}><option value="">Select brand</option>{sortedBrands.map((brand) => <option value={brand.id} key={brand.id}>{brand.name}</option>)}</Select><label className="form-field"><span>Budget amount</span><input type="number" min="0" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0" /></label><button className="primary-button" onClick={submitBudget}>{editingBudgetId ? "Update budget" : "Save budget"}</button>{editingBudgetId && <button className="quiet-button budget-cancel" onClick={resetBudgetForm}>Cancel</button>}</div>
+        <div className="budget-form"><Select label="Country" value={budgetCountry} onChange={setBudgetCountry}><option value="">Select country</option>{sortedCountries.map((country) => <option value={country.id} key={country.id}>{country.name}</option>)}</Select><Select label="Brand" value={budgetBrand} onChange={setBudgetBrand}><option value="">Select brand</option>{sortedBrands.map((brand) => <option value={brand.id} key={brand.id}>{brand.name}</option>)}</Select><label className="form-field"><span>Budget amount</span><input type="number" min="0" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0" /></label><button className="primary-button" onClick={submitBudget}>{editingBudgetId ? "Update budget" : "Save budget"}</button>{editingBudgetId && <button className="quiet-button budget-cancel" onClick={resetBudgetForm}>Cancel</button>}</div>
         <div className="budget-register">{sortedBudgets.length ? sortedBudgets.map((budget) => <div className="budget-row" key={budget.id}><span>{countries.find((country) => country.id === budget.countryId)?.name} · {brands.find((brand) => brand.id === budget.brandId)?.name}</span><b>{budget.amount.toLocaleString()}</b><div className="master-actions"><button className="icon-button" onClick={() => editBudget(budget)} aria-label="Edit budget"><Pencil size={14} /></button><DeleteControl label={`${countries.find((country) => country.id === budget.countryId)?.name ?? ""} · ${brands.find((brand) => brand.id === budget.brandId)?.name ?? ""}`} type="budget" onDelete={async () => { await removeBudget(budget.id); if (editingBudgetId === budget.id) resetBudgetForm(); setNotice("Budget deleted."); }} /></div></div>) : <div className="empty-mini"><FileUp size={18} />No budgets uploaded yet.</div>}</div>
       </section>
 

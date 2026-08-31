@@ -26,6 +26,7 @@ type WorkspaceContextValue = WorkspaceData & {
   saveBudget: (item: Budget) => Promise<void>;
   saveActivity: (item: ActivityRecord) => Promise<void>;
   saveMember: (item: Member) => Promise<void>;
+  removeCountry: (id: string) => Promise<void>;
   removeBrand: (id: string) => Promise<void>;
   removeActivityType: (id: string) => Promise<void>;
   removeBudget: (id: string) => Promise<void>;
@@ -179,7 +180,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     signIn, signOutUser,
     saveBrand: (item) => save("brands", item), saveActivityType: (item) => save("activityTypes", item), saveCountry: (item) => save("countries", item),
     saveBudget: (item) => save("budgets", item), saveActivity: (item) => save("activities", item), saveMember: (item) => save("members", item), removeActivity,
-    removeBrand: (id) => remove("brands", id), removeActivityType: (id) => remove("activityTypes", id), removeBudget: (id) => remove("budgets", id),
+    removeCountry: (id) => remove("countries", id), removeBrand: (id) => remove("brands", id), removeActivityType: (id) => remove("activityTypes", id), removeBudget: (id) => remove("budgets", id),
   }), [activeCountryId, authLoading, data, firebaseError, remove, removeActivity, role, save, signIn, signOutUser, user]);
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
